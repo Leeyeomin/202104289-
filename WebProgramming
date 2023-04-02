@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>과제#1</title>
+<script>
+ function addItem(){
+	 let todo = document.getElementById("item");
+	 let list = document.getElementById("todolist");
+	 let listitem = document.createElement("li");
+	 listitem.className
+	 = "d-flex list-group-item list-group-item-action list-gruop-item-warning";
+	 listitem.innerText = todo.value;
+	 list.appendChild(listitem);
+	 todo.vlaue = "";
+	 todo.focus();
+ }</script>
+<style>
+
+
+ h2 {
+ border-radius: 0;
+ background-color : orange;
+ text-align: center;
+ padding:15px ;
+ }
+ #regform {
+ padding : 15px 20px;
+ border-radius: 0px;
+ margin: auto;
+ width:50%;
+ background-color:orange;
+ text-align:center;
+ }
+ 
+ ul{
+  padding : 15px 20px;
+ border-radius: 0px;
+ margin: auto;
+ width:50%;
+ background-color:orange;
+ 
+ 
+ }
+ li{
+    border-bottom: 1px solid lightgrey;
+    padding-bottom: 15px;
+    padding-top: 15px;
+    font-size: 1.0em;
+    background-color:white;
+    list-style-type: none;
+    border-spacing: 0px;
+  
+  }
+ button{
+    width: 120px;
+    height: 40px;
+    font-size: 1.5em;
+    background-color: lightblue;
+    border-radius: 4px;
+    outline: 0;
+    border: none;
+  }
+  input[type="text"]{
+    width: 350px;
+    height: 30px;
+    outline: 0;
+    border: none;
+    font-size: 1.5em;
+    background: white;
+    margin-right: 10px;
+    padding: 5px;
+  }
+ </style>
+ 
+ 
+</head>
+<body>
+<h2> My ToDo App</h2>
+<div id = "regform">
+ <form name = "form1">
+ <input id = "item"  type = "text" placeholder = "할일을 입력하세요" >
+ <button type = "button"   onclick = "addItem()"> 할일 추가 
+ </button></div>
+ <ul id = "todolist" class="list-group"></ul>
+ </div>
+ </body>
+</html>
