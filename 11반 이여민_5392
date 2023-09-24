@@ -1,0 +1,123 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <pcap.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/ether.h>
+
+/* Ethernet header */
+struct ethheader {
+    u_char  ether_dhost[6];    /* destination host address */
+    u_char  ether_shost[6];    /* source host address */
+    u_short ether_type;        /* IP? ARP? RARP? etc */
+};
+
+/* IP Header */
+struct ipheader {
+    unsigned char      iph_ihl:4, //IP header length
+                       iph_ver:4; //IP version
+    unsigned char      iph_tos;   //Type of service
+    unsigned short int iph_len;   //IP Packet length (data + header)
+    unsigned short int iph_ident; //Identification
+    unsigned short int iph_flag:3,//Fragmentation flags
+                       iph_offset:13;//Flags offset
+    unsigned char      iph_ttl;   //Time to Live
+    unsigned char      iph_protocol; //Protocol type
+    unsigned short int iph_chksum; //IP datagram checksum
+    struct  in_addr    iph_sourceip; //Source IP address
+    struct  in_addr    iph_destip;   //Destination IP address
+};
+
+/* TCP Header */
+struct tcpheader {
+    u_short tcp_sport;     /* source port */
+    u_short tcp_dport;     /* destination port */
+    u_int   tcp_seq;       /* sequence number */
+    u_int   tcp_ack;       /* acknowledgement number */
+    u_char  tcp_offx2;     /* data offset, rsvd */
+#define TH_OFF(th)      (((th)->tcp_offx2 & 0xf0) >> 4)
+    u_char  tcp_flags;
+#define TH_FIN  0x01
+#define TH_SYN  0x02
+#define TH_RST  0x04
+#define TH_PUSH 0x08
+#define TH_ACK  0x10
+#define TH_URG  0x20
+#define TH_ECE  0x40
+#define TH_CWR  0x80
+#define TH_FLAGS        (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECE|TH_CWR)
+    u_short tcp_win;       /* window */
+    u_short tcp_sum;       /* checksum */
+    u_short tcp_urp;       /* urgent pointer */
+};
+
+/* Psuedo TCP header */
+struct pseudo_tcp
+{
+    unsigned saddr, daddr;
+    unsigned char mbz;
+    unsigned char ptcl;
+    unsigned short tcpl;
+    struct tcpheader tcp;
+    char payload[1500];
+};
+
+void packet_handler(u_char *user_data, const struct pcap_pkthdr *pkthdr, const u_char *packet) {
+    struct ether_header *eth_header = (struct ether_header *)packet;
+    struct ipheader *ip_header = (struct ipheader *)(packet + ETHER_HDR_LEN);
+
+    // 패킷의 프로토콜이 TCP인 경우에만 처리
+    if (ip_header->iph_protocol == IPPROTO_TCP) {
+        struct tcpheader *tcp_header = (struct tcpheader *)(packet + ETHER_HDR_LEN + (ip_header->iph_ihl << 2));
+
+        printf("Source MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", eth_header->ether_shost[0], eth_header->ether_shost[1], eth_header->ether_shost[2], eth_header->ether_shost[3], eth_header->ether_shost[4], eth_header->ether_shost[5]);
+        printf("Dest MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", eth_header->ether_dhost[0], eth_header->ether_dhost[1], eth_header->ether_dhost[2], eth_header->ether_dhost[3], eth_header->ether_dhost[4], eth_header->ether_dhost[5]);
+        printf("Source IP: %s\n", inet_ntoa(ip_header->iph_sourceip));
+        printf("Dest IP: %s\n", inet_ntoa(ip_header->iph_destip));
+        printf("Source Port: %d\n", ntohs(tcp_header->tcp_sport));
+        printf("Dest Port: %d\n", ntohs(tcp_header->tcp_dport));
+
+        // TCP 데이터 메시지 출력 (처음 20바이트만 출력)
+        int tcp_data_len = pkthdr->len - (ETHER_HDR_LEN + (ip_header->iph_ihl << 2) + TH_OFF(tcp_header) * 4);
+        if (tcp_data_len > 0) {
+            int print_len = tcp_data_len > 20 ? 20 : tcp_data_len;
+            printf("Message Data (First %d Bytes):\n", print_len);
+            for (int i = 0; i < print_len; i++) {
+                printf("%02x ", packet[ETHER_HDR_LEN + (ip_header->iph_ihl << 2) + TH_OFF(tcp_header) * 4 + i]);
+            }
+            printf("\n");
+        }
+
+        printf("\n");
+    }
+}
+
+int main() {
+    pcap_t *handle;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    struct bpf_program fp;
+    char filter_exp[] = "tcp";  // TCP 패킷만 필터링
+    bpf_u_int32 net;
+
+    // 네트워크 인터페이스 선택 (적절하게 변경)
+    char *dev = "enp0s3";
+
+    // 네트워크 인터페이스 열기
+    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+    if (handle == NULL) {
+        fprintf(stderr, "Could not open device %s: %s\n", dev, errbuf);
+        return 1;
+    }
+
+    // 패킷 필터링 설정
+    pcap_compile(handle, &fp, filter_exp, 0, net);
+    if (pcap_setfilter(handle, &fp) != 0) {
+        pcap_perror(handle, "Error:");
+        exit(EXIT_FAILURE);
+    }
+
+    // 패킷 캡처 및 처리
+    pcap_loop(handle, -1, packet_handler, NULL);
+
+    pcap_close(handle);   // 네트워크 인터페이스 핸들 닫기
+}
